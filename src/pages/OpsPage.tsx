@@ -1,20 +1,17 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CheckCircle, XCircle, HardDrive, Cpu, DollarSign, Clock, Trash2, RefreshCw } from "lucide-react";
+import { apiGet } from "@/lib/api";
 
-const healthChecks = [
-  { name: "FFmpeg", status: "ok", detail: "v6.1.2 detected at /usr/bin/ffmpeg" },
-  { name: "Redis/Queue", status: "warn", detail: "No Redis URL — using in-process queue" },
-  { name: "OpenAI", status: "ok", detail: "API key valid, GPT-4o accessible" },
-  { name: "Disk Space", status: "ok", detail: "42.3 GB free of 100 GB" },
-  { name: "Worker: research", status: "ok", detail: "Heartbeat 2s ago" },
-  { name: "Worker: writing", status: "ok", detail: "Heartbeat 3s ago" },
-  { name: "Worker: render", status: "ok", detail: "Heartbeat 1s ago" },
-  { name: "Worker: qa", status: "ok", detail: "Heartbeat 4s ago" },
-];
+interface HealthCheck {
+  name: string;
+  status: string;
+  detail: string;
+}
 
 const statusIcon = (status: string) => {
   if (status === "ok") return <CheckCircle className="h-4 w-4 text-success" />;
@@ -23,6 +20,18 @@ const statusIcon = (status: string) => {
 };
 
 export default function OpsPage() {
+  const [healthChecks, setHealthChecks] = useState<HealthCheck[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  function fetchHealth() {
+    setLoading(true);
+    apiGet<{ ok: boolean; checks: HealthCheck[] }>("/api/ops/health")
+      .then((data) => { setHealthChecks(data.checks || []); setLoading(false); })
+      .catch(() => { setHealthChecks([{ name: "Backend", status: "error", detail: "Cannot reach backend server" }]); setLoading(false); });
+  }
+
+  useEffect(() => { fetchHealth(); }, []);
+
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
       <div>
@@ -37,7 +46,7 @@ export default function OpsPage() {
             <Cpu className="h-4 w-4 text-primary" /> System Health
           </h2>
           <div className="space-y-2">
-            {healthChecks.map((check, i) => (
+            {healthChecks.map((check) => (
               <div key={check.name} className="flex items-center gap-3 p-2 rounded bg-secondary/30 border border-border">
                 {statusIcon(check.status)}
                 <div className="flex-1">
@@ -47,8 +56,8 @@ export default function OpsPage() {
               </div>
             ))}
           </div>
-          <Button variant="outline" size="sm" className="mt-3 w-full font-mono text-xs">
-            <RefreshCw className="h-3 w-3 mr-1.5" /> Refresh Health Checks
+          <Button variant="outline" size="sm" className="mt-3 w-full font-mono text-xs" onClick={fetchHealth}>
+            <RefreshCw className={`h-3 w-3 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh Health Checks
           </Button>
         </motion.div>
 

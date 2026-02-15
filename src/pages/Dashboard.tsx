@@ -118,9 +118,9 @@ export default function Dashboard() {
     if (!event?.kind) return;
 
     if (event.kind === "agent_state") {
-      const { name, state, thoughts } = event.payload || {};
+      const { name, state, thoughts, currentThought } = event.payload || {};
       setAgents((prev) =>
-        prev.map((a) => (a.name === name ? { ...a, state, thoughts } : a))
+        prev.map((a) => (a.name === name ? { ...a, state, thoughts, currentThought } : a))
       );
     }
 

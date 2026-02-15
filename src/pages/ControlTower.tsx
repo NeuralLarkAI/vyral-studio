@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Lock, RefreshCw, Play, Pause, MessageSquare, ArrowUpRight, Shield, Brain, Target, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,66 @@ import { MessageStream } from "@/components/MessageStream";
 import { QueuePanel } from "@/components/QueuePanel";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockAgents, mockMessages, mockQueues, Agent } from "@/lib/mockData";
+import { Agent, AgentMessage, QueueStatus } from "@/lib/mockData";
+import { apiGet } from "@/lib/api";
+import { useBackendSocket } from "@/hooks/useBackendSocket";
 
 export default function ControlTower() {
-  const [selectedAgent, setSelectedAgent] = useState<Agent>(mockAgents[0]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [queues, setQueues] = useState<QueueStatus[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+
+  // Fetch data from backend on mount
+  useEffect(() => {
+    apiGet<Agent[]>("/api/agents")
+      .then((data) => {
+        setAgents(data);
+        if (data.length > 0) setSelectedAgent(data[0]);
+      })
+      .catch(() => setAgents([]));
+
+    apiGet<AgentMessage[]>("/api/messages")
+      .then(setMessages)
+      .catch(() => setMessages([]));
+
+    apiGet<QueueStatus[]>("/api/ops/queue")
+      .then(setQueues)
+      .catch(() => setQueues([]));
+  }, []);
+
+  // Live updates via WebSocket
+  useBackendSocket((event) => {
+    if (!event?.kind) return;
+
+    if (event.kind === "agent_state") {
+      const { name, state, currentThought } = event.payload || {};
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.name === name ? { ...a, state, currentThought: currentThought || a.currentThought } : a
+        )
+      );
+      setSelectedAgent((prev) =>
+        prev && prev.name === name ? { ...prev, state, currentThought: currentThought || prev.currentThought } : prev
+      );
+    }
+
+    if (event.kind === "message") {
+      setMessages((prev) => [event.payload as AgentMessage, ...prev]);
+    }
+
+    if (event.kind === "queue_update") {
+      setQueues(event.payload);
+    }
+  });
+
+  if (!selectedAgent) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-sm text-muted-foreground font-mono">Loading agents from backend...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-[1800px] mx-auto">
@@ -31,7 +87,7 @@ export default function ControlTower() {
         <div className="lg:col-span-3 space-y-3">
           <h2 className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Agent Roster</h2>
           <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-1">
-            {mockAgents.map(agent => (
+            {agents.map(agent => (
               <AgentCard
                 key={agent.id}
                 agent={agent}
@@ -46,7 +102,7 @@ export default function ControlTower() {
         <div className="lg:col-span-5 space-y-4">
           <h2 className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Live Message Stream</h2>
           <div className="p-5 rounded-xl border border-border bg-card max-h-[500px] overflow-y-auto">
-            <MessageStream messages={mockMessages} />
+            <MessageStream messages={messages} />
           </div>
 
           {/* Interventions */}
@@ -77,7 +133,7 @@ export default function ControlTower() {
           {/* Queue */}
           <div className="p-5 rounded-xl border border-border bg-card">
             <h2 className="text-sm font-semibold text-foreground mb-3">Queue & Workers</h2>
-            <QueuePanel queues={mockQueues} />
+            <QueuePanel queues={queues} />
           </div>
         </div>
 
@@ -93,22 +149,22 @@ export default function ControlTower() {
               <div className="grid grid-cols-4 gap-3">
                 <div className="text-center">
                   <Target className="h-4 w-4 mx-auto mb-1 text-primary" />
-                  <p className="text-lg font-bold font-mono text-foreground">{(selectedAgent.kpis.selectionRate * 100).toFixed(0)}%</p>
+                  <p className="text-lg font-bold font-mono text-foreground">{((selectedAgent.kpis?.selectionRate ?? 0) * 100).toFixed(0)}%</p>
                   <p className="text-[10px] text-muted-foreground">Selection</p>
                 </div>
                 <div className="text-center">
                   <Zap className="h-4 w-4 mx-auto mb-1 text-neon-cyan" />
-                  <p className="text-lg font-bold font-mono text-foreground">{(selectedAgent.kpis.upliftContribution * 100).toFixed(0)}%</p>
+                  <p className="text-lg font-bold font-mono text-foreground">{((selectedAgent.kpis?.upliftContribution ?? 0) * 100).toFixed(0)}%</p>
                   <p className="text-[10px] text-muted-foreground">Uplift</p>
                 </div>
                 <div className="text-center">
                   <Shield className="h-4 w-4 mx-auto mb-1 text-destructive" />
-                  <p className="text-lg font-bold font-mono text-foreground">{(selectedAgent.kpis.failureRate * 100).toFixed(0)}%</p>
+                  <p className="text-lg font-bold font-mono text-foreground">{((selectedAgent.kpis?.failureRate ?? 0) * 100).toFixed(0)}%</p>
                   <p className="text-[10px] text-muted-foreground">Failure</p>
                 </div>
                 <div className="text-center">
                   <Brain className="h-4 w-4 mx-auto mb-1 text-neon-purple" />
-                  <p className="text-lg font-bold font-mono text-foreground">{selectedAgent.kpis.avgLatency}s</p>
+                  <p className="text-lg font-bold font-mono text-foreground">{selectedAgent.kpis?.avgLatency ?? 0}s</p>
                   <p className="text-[10px] text-muted-foreground">Latency</p>
                 </div>
               </div>
@@ -156,12 +212,6 @@ export default function ControlTower() {
                     <span className="text-[10px] font-mono text-muted-foreground">LIVE</span>
                   </div>
                   <p className="text-xs font-mono text-foreground">{selectedAgent.currentThought}</p>
-                  <div className="border-t border-border pt-2 mt-2">
-                    <p className="text-[10px] text-muted-foreground mb-1">Recent:</p>
-                    <p className="text-xs font-mono text-muted-foreground">• Initialized with niche "History"</p>
-                    <p className="text-xs font-mono text-muted-foreground">• Loaded glossary (47 terms, 12 banned)</p>
-                    <p className="text-xs font-mono text-muted-foreground">• Connected to trend sources</p>
-                  </div>
                 </div>
               </TabsContent>
 
@@ -170,13 +220,13 @@ export default function ControlTower() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-mono text-foreground">Trust Score</span>
-                      <span className="text-sm font-bold font-mono text-primary">{(selectedAgent.trustScore * 100).toFixed(0)}%</span>
+                      <span className="text-sm font-bold font-mono text-primary">{((selectedAgent.trustScore ?? 0) * 100).toFixed(0)}%</span>
                     </div>
-                    <Slider defaultValue={[selectedAgent.trustScore * 100]} max={100} step={1} className="w-full" />
+                    <Slider defaultValue={[(selectedAgent.trustScore ?? 0) * 100]} max={100} step={1} className="w-full" />
                   </div>
                   <div className="space-y-2 pt-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Relationships</p>
-                    {mockAgents.filter(a => a.id !== selectedAgent.id).slice(0, 4).map(a => (
+                    {agents.filter(a => a.id !== selectedAgent.id).slice(0, 4).map(a => (
                       <div key={a.id} className="flex items-center justify-between">
                         <span className="text-xs font-mono text-muted-foreground">{a.name}</span>
                         <span className="text-xs font-mono text-primary">{(0.5 + Math.random() * 0.5).toFixed(2)}</span>
