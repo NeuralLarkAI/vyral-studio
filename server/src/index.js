@@ -52,6 +52,20 @@ app.get("/api/messages", (req, res) => {
   res.json(out);
 });
 
+// Queue status
+app.get("/api/ops/queue", (req, res) => {
+  const queued = runs.filter(r => r.status === "QUEUED").length;
+  const running = runs.filter(r => r.status === "RUNNING").length;
+  const done = runs.filter(r => r.status === "DONE").length;
+  res.json({
+    queued,
+    running,
+    done,
+    total: runs.length,
+    activeAgents: agents.filter(a => a.state !== "Idle").length
+  });
+});
+
 // Create run
 app.post("/api/runs", (req, res) => {
   const { niche = "History/Facts", mode = "auto", topic = null, preview = true } = req.body || {};
