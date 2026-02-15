@@ -402,7 +402,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 className="flex-1 font-mono text-xs"
-                onClick={() => toast({ title: "MP4", description: "Wire to backend artifact URL when available." })}
+                onClick={() => toast({ title: "MP4", description: "Download will be available once the render is complete." })}
               >
                 <Download className="h-3 w-3 mr-1" /> MP4
               </Button>
@@ -410,7 +410,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 className="flex-1 font-mono text-xs"
-                onClick={() => toast({ title: "Thumb", description: "Wire to backend thumbnail URL when available." })}
+                onClick={() => toast({ title: "Thumbnail", description: "Download will be available once the render is complete." })}
               >
                 <Download className="h-3 w-3 mr-1" /> Thumb
               </Button>
