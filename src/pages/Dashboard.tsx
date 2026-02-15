@@ -49,7 +49,13 @@ type Run = {
   viralityScore?: number | null;
 };
 
-type QueueStatus = any; // backend can shape this later; keep flexible
+type QueueStatus = {
+  name: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+}[];
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -65,7 +71,7 @@ export default function Dashboard() {
   const [healthOk, setHealthOk] = useState<boolean | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [queues, setQueues] = useState<QueueStatus | null>(null);
+  const [queues, setQueues] = useState<QueueStatus>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
@@ -101,10 +107,10 @@ export default function Dashboard() {
       .then(setMessages)
       .catch(() => setMessages([]));
 
-    // If your backend doesn’t have /api/ops/queue yet, this will just fail gracefully.
+    // If your backend doesn't have /api/ops/queue yet, this will just fail gracefully.
     apiGet<QueueStatus>("/api/ops/queue")
       .then(setQueues)
-      .catch(() => setQueues(null));
+      .catch(() => setQueues([]));
   }, []);
 
   // Live updates via WS
@@ -519,7 +525,7 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-foreground mb-3">
               Queue Status
             </h2>
-            <QueuePanel queues={queues ?? {}} />
+            <QueuePanel queues={queues} />
           </div>
         </motion.div>
       </div>

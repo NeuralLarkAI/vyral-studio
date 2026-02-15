@@ -57,13 +57,18 @@ app.get("/api/ops/queue", (req, res) => {
   const queued = runs.filter(r => r.status === "QUEUED").length;
   const running = runs.filter(r => r.status === "RUNNING").length;
   const done = runs.filter(r => r.status === "DONE").length;
-  res.json({
-    queued,
-    running,
-    done,
-    total: runs.length,
-    activeAgents: agents.filter(a => a.state !== "Idle").length
-  });
+
+  // Return array format matching frontend QueueStatus[]
+  const queues = [
+    { name: 'research', waiting: 0, active: agents.find(a => a.name === 'TrendScout')?.state !== 'Idle' ? 1 : 0, completed: done, failed: 0 },
+    { name: 'writing', waiting: 0, active: agents.find(a => a.name === 'Scriptwriter')?.state !== 'Idle' ? 1 : 0, completed: done, failed: 0 },
+    { name: 'audio', waiting: 0, active: agents.find(a => a.name === 'AudioEngineer')?.state !== 'Idle' ? 1 : 0, completed: done, failed: 0 },
+    { name: 'subtitles', waiting: 0, active: agents.find(a => a.name === 'SubtitleSmith')?.state !== 'Idle' ? 1 : 0, completed: done, failed: 0 },
+    { name: 'render', waiting: 0, active: agents.find(a => a.name === 'RenderBot')?.state !== 'Idle' ? 1 : 0, completed: done, failed: 0 },
+    { name: 'qa', waiting: queued, active: running, completed: done, failed: 0 }
+  ];
+
+  res.json(queues);
 });
 
 // Create run
@@ -99,7 +104,16 @@ function broadcast(event) {
 }
 
 function pushMessage({ runId, from, to, type, text }) {
-  const msg = { id: crypto.randomUUID(), runId, ts: new Date().toISOString(), from, to, type, text };
+  const ts = new Date().toTimeString().slice(0, 8); // HH:MM:SS format
+  const msg = {
+    id: crypto.randomUUID(),
+    runId,
+    ts,
+    fromAgent: from,
+    toAgent: to,
+    type,
+    content: text
+  };
   messages.unshift(msg);
   broadcast({ kind: "message", payload: msg });
 }
